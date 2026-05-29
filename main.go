@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"io"
 	"maps"
@@ -59,13 +60,49 @@ func main() {
 				return err
 			}
 
+			if filepath.Ext(outputFile) == "csv" {
+				csvOut := csv.NewWriter(out)
+				for _, npc := range resp {
+					for _, r := range npc.Responses {
+						csvOut.Write([]string{npc.NPC, r})
+					}
+				}
+				csvOut.Flush()
+				return csvOut.Error()
+			}
+
 			for _, npc := range resp {
 				for _, r := range npc.Responses {
 					fmt.Fprintf(out, "%s: %s\n", npc.NPC, r)
 				}
 			}
-
 			return nil
+		},
+	}
+
+	npcResponsesCSVCmd := &cobra.Command{
+		Use:  "responses-csv --dir=... [--out=f]",
+		Args: cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			out, outClose, err := output()
+			if err != nil {
+				return err
+			}
+			defer outClose()
+
+			resp, err := npc.ProcessDir(dir)
+			if err != nil {
+				return err
+			}
+
+			csvOut := csv.NewWriter(out)
+			for _, npc := range resp {
+				for _, r := range npc.Responses {
+					csvOut.Write([]string{npc.NPC, r})
+				}
+			}
+			csvOut.Flush()
+			return csvOut.Error()
 		},
 	}
 
@@ -73,7 +110,7 @@ func main() {
 		Use: "map",
 	}
 
-	mapTilesCmd := &cobra.Command{
+	mapStringsCmd := &cobra.Command{
 		Use:  "strings --dir=... [--out=f]",
 		Args: cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -119,11 +156,53 @@ func main() {
 		},
 	}
 
+	mapStringsCSVCmd := &cobra.Command{
+		Use:  "strings-csv --dir=... [--out=f]",
+		Args: cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			out, outClose, err := output()
+			if err != nil {
+				return err
+			}
+			defer outClose()
+
+			sectors, err := mapfile.ProcessDir(dir)
+			if err != nil {
+				return err
+			}
+
+			csvOut := csv.NewWriter(out)
+
+			var stringsF func(p mapfile.Pos, i mapfile.Item)
+			stringsF = func(p mapfile.Pos, i mapfile.Item) {
+				if i.String != "" {
+					csvOut.Write([]string{fmt.Sprint(i.ID), i.String})
+				}
+				for _, c := range i.Content {
+					stringsF(p, c)
+				}
+			}
+
+			for _, sec := range sectors {
+				for _, tile := range sec.Tiles {
+					for _, i := range tile.Items {
+						stringsF(tile.Pos, i)
+					}
+				}
+			}
+
+			csvOut.Flush()
+			return csvOut.Error()
+		},
+	}
+
 	rootCmd.PersistentFlags().StringVar(&dir, "dir", "", "Path to the relevant directory.")
 	rootCmd.PersistentFlags().StringVar(&outputFile, "out", "", "Output file path; stdout when empty.")
 	rootCmd.AddCommand(npcCmd, mapCmd)
 	npcCmd.AddCommand(npcResponsesCmd)
-	mapCmd.AddCommand(mapTilesCmd)
+	npcCmd.AddCommand(npcResponsesCSVCmd)
+	mapCmd.AddCommand(mapStringsCmd)
+	mapCmd.AddCommand(mapStringsCSVCmd)
 
 	if rootCmd.Execute() != nil {
 		os.Exit(1)
