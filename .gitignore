@@ -1,0 +1,12 @@
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+*
+
+!.gitignore
+!*.go
+!*.sh
+!*/
+
+!/go.sum
+!/go.mod
+!/LICENSE
+!/README.md
