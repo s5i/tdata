@@ -90,7 +90,7 @@ func ParseFile(path string) (*Sector, error) {
 	}
 	defer f.Close()
 
-	r := transform.NewReader(f, charmap.ISO8859_1.NewDecoder())
+	r := transform.NewReader(f, charmap.Windows1252.NewDecoder())
 
 	sec := &Sector{SectorX: sx, SectorY: sy, SectorZ: sz}
 	scanner := bufio.NewScanner(r)
